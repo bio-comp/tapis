@@ -19,34 +19,39 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import sys
+from argparse import ArgumentParser
+
+import numpy
 import pysam
-from argparse import ArgumentParser, ArgumentTypeError
-import os, sys, numpy
-from SpliceGrapher.formats.FastaLoader import FastaLoader                
-from SpliceGrapher.shared.utils import *    
-parser = ArgumentParser(description='Fix aligned reads using reference genome')                                                                  
+from SpliceGrapher.formats.FastaLoader import FastaLoader
+from SpliceGrapher.shared.utils import *
+
+from tapis.enums import AnchorCigarOp, SamCigarOp
+
+parser = ArgumentParser(description='Fix aligned reads using reference genome')
 parser.add_argument('-v', '--verbose', dest="verbose",
                     action='store_true', default=False,
                     help='Verbose mode')
 parser.add_argument('-a', '--anchorIgnoreLim', dest="anchorAdjustLim",
-                    action='store', type=int, default=0, 
+                    action='store', type=int, default=0,
                     help='Amount of anchor to ignore when correcting aligned reads.')
 
 parser.add_argument('-f', '--fasta_output', dest="fasta_output",
-                    action='store', type=str, default='fixed.fa', 
+                    action='store', type=str, default='fixed.fa',
                     help='File name for writing fixed FASTA records')
 parser.add_argument('-u', '--unaligned', dest="unaligned_output",
-                    action='store', type=str, default='unaligned.txt', 
+                    action='store', type=str, default='unaligned.txt',
                     help='File name for writing unaligned reads')
 parser.add_argument('-r', '--filtered', dest="filtered_output",
-                    action='store', type=str, default='filtered.txt', 
+                    action='store', type=str, default='filtered.txt',
                     help='File name for writing rejected FASTA records')
 parser.add_argument('-j', '--junctions', dest="junctions_output",
-                    action='store', type=str, default='junctions.txt', 
+                    action='store', type=str, default='junctions.txt',
                     help='File name for writing junctions summary')
 
 parser.add_argument('-s', '--sam_output', dest="sam_output",
-                    action='store', type=str, default='fixed.sam', 
+                    action='store', type=str, default='fixed.sam',
                     help='Name for writing fixed SAM records')
 
 parser.add_argument('-t', '--thresh', dest="thresh",
@@ -57,25 +62,25 @@ parser.add_argument('-e', '--edr', dest="edr",
                     action='store', type=float, default=0.10,
                     help='Edit distance ratio threshold')
 
-parser.add_argument('reference', action='store', 
+parser.add_argument('reference', action='store',
                     type=str, help='Reference sequence')
-parser.add_argument('bam_input', action='store', 
+parser.add_argument('bam_input', action='store',
                     type=str, help='BAM file input file to fix')
 args = parser.parse_args()
 MAPQTHRESH = args.thresh
-MATCH    = 0   #M
-INSERT   = 1   #I
-DELETE   = 2   #D
-GAP      = 3   #N
-SOFT_CLIP= 4   #4
-HARD_CLIP= 5   #H
-PAD      = 6   #P
-EQUAL    = 7   #=
-DIFF     = 8   #X
-AMATCHL  = 101 #match for keeping left anchors untouched
-AMATCHR  = 102 #match for keeping right anchors untouched
-AINSERT  = 11  #insert for keeping anchors untouched
-ADELETE  = 12  #delete for keeping anchors untouched
+MATCH    = SamCigarOp.MATCH.value
+INSERT   = SamCigarOp.INSERT.value
+DELETE   = SamCigarOp.DELETE.value
+GAP      = SamCigarOp.GAP.value
+SOFT_CLIP= SamCigarOp.SOFT_CLIP.value
+HARD_CLIP= SamCigarOp.HARD_CLIP.value
+PAD      = SamCigarOp.PAD.value
+EQUAL    = SamCigarOp.EQUAL.value
+DIFF     = SamCigarOp.DIFF.value
+AMATCHL  = AnchorCigarOp.AMATCHL.value
+AMATCHR  = AnchorCigarOp.AMATCHR.value
+AINSERT  = AnchorCigarOp.AINSERT.value
+ADELETE  = AnchorCigarOp.ADELETE.value
 
 loader = FastaLoader(args.reference, verbose=args.verbose)
 bamfile = pysam.Samfile(args.bam_input , 'rb' )
@@ -94,7 +99,7 @@ insertions = [ ]
 mismatchesSJ = 0
 deletionsSJ = [ ]
 insertionsSJ = [ ]
-totN = 0 
+totN = 0
 totSJ = 0
 sSJ = 0
 pstrand = 0
@@ -107,7 +112,7 @@ SJdict = {}
 revCDict = {'G':'C','C':'G','T':'A','A':'T','N':'N'}
 def revComp(s):
     return ''.join([revCDict[x] for x in s])[::-1]
-    
+
 def junctionAdjust( cigarList, aLim ):
     """
     Adjust cigar so that we do not fix up to k nucleotides in anchors
@@ -123,13 +128,13 @@ def junctionAdjust( cigarList, aLim ):
             stop = -1
         else:
             stop = max(gapIdxs[ridx-1], -1)
-        
+
         aRem = aLim
         iIdx = gidx - 1
         while iIdx > stop and aRem > 0:
             t,l = cigarList[iIdx]
             # MATCH
-            # create a match record with amount to 
+            # create a match record with amount to
             if t == MATCH:
                 if aRem < l:
                     keep = aRem
@@ -152,7 +157,7 @@ def junctionAdjust( cigarList, aLim ):
             stop = len(cigarList)
         else:
             stop = min(gapIdxs[ridx+1], len(cigarList))
-        
+
         aRem = aLim
         iIdx = gidx + 1
         while iIdx < stop and aRem > 0:
@@ -178,7 +183,7 @@ if args.verbose:
     sys.stderr.write('Processing SAM records\n')
 
 for read in bamfile:
-    ed = 0 
+    ed = 0
     rmismatches = 0
     rdeletions = [ ]
     rinsertions = [ ]
@@ -215,9 +220,9 @@ for read in bamfile:
         XL += read.cigar[0][1]
     if read.cigar[-1][0] == SOFT_CLIP:
         XR += read.cigar[-1][1]
-        
+
     junctions = [ ]
-    cigarL = read.cigar[:] 
+    cigarL = read.cigar[:]
 
     if args.anchorAdjustLim > 0:
         junctionAdjust(cigarL, args.anchorAdjustLim)
@@ -259,7 +264,7 @@ for read in bamfile:
             readseq  = read.query[rpos:(rpos+keep)]
             refseq =  loader.subsequence( bamfile.getrname(read.tid), pos, pos+keep-1 )
             for sidx in xrange(len(refseq)):
-                if refseq[sidx] != readseq[sidx]: 
+                if refseq[sidx] != readseq[sidx]:
                     rmismatchesSJ += 1
                     ed += 1
             cleanSeq = ''.join([cleanSeq,readseq] )
@@ -277,9 +282,9 @@ for read in bamfile:
             rpos += keep
             matchLen += keep
             for sidx in xrange(len(refseq)):
-                if refseq[sidx] != readseq[sidx]: 
+                if refseq[sidx] != readseq[sidx]:
                     rmismatchesSJ += 1
-                    ed += 1 
+                    ed += 1
 
             # adjust
             if adj > 0:
@@ -287,7 +292,7 @@ for read in bamfile:
                 pos = pos+ adj
                 readseq  = read.query[rpos:(rpos+adj)]
                 for sidx in xrange(len(refseq)):
-                    if refseq[sidx] != readseq[sidx]: 
+                    if refseq[sidx] != readseq[sidx]:
                         rmismatches += 1
                         ed += 1
                 if 'N' in refseq:
@@ -308,7 +313,7 @@ for read in bamfile:
             cleanSeq = ''.join([cleanSeq,readseq] )
             rpos += l
             rinsertionsSJ.append(l)
-            ed += l 
+            ed += l
         #deletion
         elif t == DELETE:
             refseq = loader.subsequence( bamfile.getrname(read.tid), pos, pos+l-1 )
@@ -316,7 +321,7 @@ for read in bamfile:
             pos += l
             matchLen += l
             rdeletions.append(l)
-            ed += l 
+            ed += l
         #adjusted deletion
         elif t == ADELETE:
             pos += l
@@ -325,13 +330,13 @@ for read in bamfile:
         elif t == GAP:
             rtotSJ += 1
             if matchLen == 0:
-                print read.qname
+                sys.stderr.write('%s\n' % (read.qname))
             cleanCigar.append( (0,matchLen) )
-            matchLen = 0    
+            matchLen = 0
             cleanCigar.append( (t,l) )
             p5 = loader.subsequence( bamfile.getrname(read.tid), pos, pos+1 )
             p3 = loader.subsequence( bamfile.getrname(read.tid), pos+l-2, pos+l-1 )
-            if 'N' in p5 or 'N' in p3: 
+            if 'N' in p5 or 'N' in p3:
                 ambSJ = True
             elif strand == '+':
                 pair = '%s-%s' % (p5,p3)
@@ -343,12 +348,12 @@ for read in bamfile:
                 rsSJ += 1
                 rSJdict[pair] = rSJdict.get(pair,0) + 1
                 junctions.append(pair)
-            pos += l 
+            pos += l
         else:
             if i > 0 and i+1 < len(read.cigar):
-                print i, len(read.cigar)
-                print t
-                print read.cigar
+                sys.stderr.write('%d %d\n' % (i, len(read.cigar)))
+                sys.stderr.write('%s\n' % (str(t)))
+                sys.stderr.write('%s\n' % (str(read.cigar)))
     totN += read.qlen
     if ambSJ:
         filtered += 1
@@ -358,7 +363,7 @@ for read in bamfile:
         filtered += 1
         filteredfile.write('%s_ambseq\n' % (read.qname))
         continue
-        
+
 
     #ed = rmismatches + sum(rdeletions) + sum(rinsertions) + rmismatchesSJ + sum(rdeletionsSJ) + sum( rinsertionsSJ)
 
@@ -404,7 +409,7 @@ for read in bamfile:
     # no more errors
     if ed == 0:
         outfile.write(a)
-    
+
     elif len(cleanSeq) > 0:
         fastafile.write('>%s\n%s\n' % (a.qname, cleanSeq))
     else:
@@ -442,15 +447,15 @@ if args.verbose:
     acceptPerc = float(accepted)/tot * 100
     unalignedPerc = float(unaligned)/tot * 100
     filteredPerc = float(filtered)/tot * 100
-    sys.stderr.write('accepted: %d(%0.2f%%) filtered:%d(%0.2f%%) unaligned:%d(%0.2f%%)\n' % (accepted, 
-                                                                                        acceptPerc, 
-                                                                                        filtered, 
-                                                                                        filteredPerc, 
+    sys.stderr.write('accepted: %d(%0.2f%%) filtered:%d(%0.2f%%) unaligned:%d(%0.2f%%)\n' % (accepted,
+                                                                                        acceptPerc,
+                                                                                        filtered,
+                                                                                        filteredPerc,
                                                                                         unaligned,
                                                                                         unalignedPerc,
                                                                                         ))
 
-    sys.stderr.write('Processed %d reads: %d (%0.2f%%) spliced alignments, %d (%0.2f%%) contiguous alignments\n' % (tot, spliced, 
+    sys.stderr.write('Processed %d reads: %d (%0.2f%%) spliced alignments, %d (%0.2f%%) contiguous alignments\n' % (tot, spliced,
                                                                                                                     float(spliced)/accepted*100,
                                                                                                                     accepted-spliced,
                                                                                                                     (1-float(spliced)/accepted)*100))
@@ -460,7 +465,7 @@ if args.verbose:
                                                                                                     float(nstrand)/accepted*100,
                                                                                                     astrand,
                                                                                                     float(astrand)/accepted*100))
-    sys.stderr.write('accepted: %d stranded junctions, %d total junctions\n' % (sSJ, totSJ) ) 
+    sys.stderr.write('accepted: %d stranded junctions, %d total junctions\n' % (sSJ, totSJ) )
     sjitems = SJdict.items()
     sjitems.sort(key=lambda x: x[1], reverse=1)
     junction_ofile = open( args.junctions_output, 'w' )

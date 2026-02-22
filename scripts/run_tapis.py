@@ -1,31 +1,35 @@
 #! /usr/bin/env python
-import pysam,os,numpy,collections,subprocess
-from argparse import ArgumentParser, ArgumentTypeError
-from SpliceGrapher.formats.loader import loadGeneModels
-from SpliceGrapher.formats.GeneModel import *        
-from SpliceGrapher.formats import fasta
-from SpliceGrapher.SpliceGraph       import *
-from SpliceGrapher.shared.GeneModelConverter import *
-from bx.intervals.cluster import ClusterTree
-import matplotlib
-matplotlib.use('agg')
-from matplotlib import pyplot as plt
-#from matplotlib_venn import venn2, venn3
-###################################################
-from SpliceGrapher.shared.utils       import *
-from SpliceGrapher.plot.PlotterConfig import *
-from SpliceGrapher.view.ViewerUtils   import *
-from SpliceGrapher.plot.PlotUtils import *
-from sys import maxint as MAXINT
-from itertools import chain
-import os,sys
-import warnings  
-import numpy, ConfigParser
-from matplotlib.patches import Rectangle
-#warnings.filterwarnings('ignore')
-from matplotlib import rc
-rc('text', usetex=True)
-import numpy as np
+import collections
+import os
+import sys
+from argparse import ArgumentParser
+
+HELP_ONLY = any(arg in ("-h", "--help") for arg in sys.argv[1:])
+
+if not HELP_ONLY:
+    import matplotlib
+    import numpy
+    import pysam
+    from bx.intervals.cluster import ClusterTree
+    from matplotlib import pyplot as plt
+    from matplotlib import rc
+    from matplotlib.patches import Rectangle
+    from SpliceGrapher.formats.GeneModel import *
+    from SpliceGrapher.formats.loader import loadGeneModels
+    from SpliceGrapher.plot.PlotterConfig import *
+    from SpliceGrapher.plot.PlotUtils import *
+    from SpliceGrapher.shared.GeneModelConverter import *
+    from SpliceGrapher.shared.utils import *
+    from SpliceGrapher.SpliceGraph import *
+    from SpliceGrapher.view.ViewerUtils import *
+
+    matplotlib.use("agg")
+    rc("text", usetex=True)
+else:
+    # Permit basic CLI help output without heavy runtime dependencies.
+    pass
+
+MAXINT = sys.maxsize
 DEFAULT_FONT   = 12
 DEFAULT_HEIGHT = 11.0
 DEFAULT_WIDTH  = 8.5
@@ -54,13 +58,13 @@ parser.add_argument('-s', '--minSupport', dest="minSupport",
                     action='store', type=int, default=2,
                     help='Minimum number of trusted reads supporting a poly-A site, default=2')
 
-parser.add_argument('geneModel', action='store', 
+parser.add_argument('geneModel', action='store',
                     type=str, help='Gene models annotation file (GFF/GTF)')
-parser.add_argument('bamfile', action='store', 
+parser.add_argument('bamfile', action='store',
                     type=str, help='Aligned reads file (sorted and indexed)')
 
 
-            
+
 args = parser.parse_args()
 if not os.path.exists(args.outdir):
     os.makedirs(args.outdir)
@@ -82,7 +86,7 @@ def junctionItr( read ):
         jct = ( read.blocks[bidx][1]+1, read.blocks[bidx+1][0])
         if abs( jct[0] - jct[1]) > 10:
             yield jct
-    
+
 def clusterToGraphP( cluster, chromosome, name='noneThusFar'):
     cluster.sort( key=lambda x: len(x.blocks), reverse=1)
     unresolved = set()
@@ -255,15 +259,15 @@ def plotNovel(graph, cluster, outname, shrink_introns=False):
     minPos = graph.minpos
     maxPos = graph.maxpos
     plt.figure(frameon=False)
-    
+
     titlePadding = getTitlePadding(16)
     topLine      = 0.99-titlePadding
     c = 1
     height         = topLine * (1.0/(1+c) - titlePadding)
     patchDict = {}
-    # Plot gene model 
+    # Plot gene model
     curAxes        = axes([AXIS_LEFT, topLine-height, AXIS_WIDTH, height])
-    topLine        = topLine - height - titlePadding 
+    topLine        = topLine - height - titlePadding
 
     SpliceGraphView(graph, curAxes,
                     xLimits=(minPos-40, maxPos+40)).plot(xLabels=True)
@@ -274,7 +278,7 @@ def plotNovel(graph, cluster, outname, shrink_introns=False):
         xlim = xlim[::-1]
     curAxes.set_xlim(xlim)
     curAxes.set_xticklabels([])
-    
+
     #plot reads
     if graph.strand == '+':
         cluster.sort( key=lambda x: x.blocks[0][0], reverse=1 )
@@ -286,31 +290,31 @@ def plotNovel(graph, cluster, outname, shrink_introns=False):
     for i, r in enumerate(cluster):
         tdict = dict(r.tags)
         if 1:#tdict['XF']:
-            curAxes.plot( [r.blocks[0][0], r.blocks[-1][1] ], 
+            curAxes.plot( [r.blocks[0][0], r.blocks[-1][1] ],
                           [(i+1),(i+1)], 'k', ls='-')
             for b in r.blocks:
                 curAxes.add_patch(Rectangle( (b[0]+1, i+.8), b[1] - b[0], .4,
                                               alpha=1, facecolor='k'))
 
-        
+
     curAxes.set_xlim(xlim)
     curAxes.get_xaxis().get_major_formatter().set_useOffset(False)
     xticks = curAxes.get_xticks()
     curAxes.set_xticklabels([str(int(x)) for x in xticks], size=12)
     #curAxes.set_xticks(xticks)
     plt.ylim((0, 2+i))
-    
+
 
     topLine        = topLine - height - titlePadding
     curAxes.set_title('Reads', size=tsize)
     #plt.gca().get_xaxis().get_major_formatter().set_useOffset(False)
-    
-    #plotLegend(patchDict)                    
+
+    #plotLegend(patchDict)
     #plt.show()
     plt.savefig(outname, dpi=400)
     plt.close()
 
-            
+
 def plotCluster(referenceGenes, graph, cluster, start, end, geneModel, outname, graph2=None, shrink_introns=False):
     """
     Plot pacBio reads for a gene
@@ -326,16 +330,16 @@ def plotCluster(referenceGenes, graph, cluster, start, end, geneModel, outname, 
     minPos = min( refGraph.minpos, graph.minpos)
     maxPos = max( refGraph.maxpos, graph.maxpos)
     plt.figure(frameon=False)
-    
+
     titlePadding = getTitlePadding(16)
     topLine      = 0.99-titlePadding
     c = 2
     if graph2: c += 1
     height         = topLine * (1.0/(1+c) - titlePadding)
     patchDict = {}
-    # Plot gene model 
+    # Plot gene model
     curAxes        = axes([AXIS_LEFT, topLine-height, AXIS_WIDTH, height])
-    topLine        = topLine - height - titlePadding 
+    topLine        = topLine - height - titlePadding
     GeneView(referenceGenes, curAxes).plot()
     SpliceGraphView(refGraph, curAxes, xLimits=(minPos-40, maxPos+40)).plot()
     if len(referenceGenes) == 1:
@@ -351,11 +355,11 @@ def plotCluster(referenceGenes, graph, cluster, start, end, geneModel, outname, 
     #xticks = setXticks(int(min(xlim)), int(max(xlim)))
 
     curAxes.set_xticklabels([])
-    
+
     # plot prediction
     if 1:
         curAxes        = axes([AXIS_LEFT, topLine-height, AXIS_WIDTH, height])
-        topLine        = topLine - height - titlePadding         
+        topLine        = topLine - height - titlePadding
         GeneView(referenceGenes, curAxes).plot()
         SpliceGraphView(graph, curAxes, xLimits=(minPos, maxPos)).plot()
         curAxes.set_title('PacBio Model', size=tsize)
@@ -372,7 +376,7 @@ def plotCluster(referenceGenes, graph, cluster, start, end, geneModel, outname, 
         curAxes        = axes([AXIS_LEFT, topLine-height, AXIS_WIDTH, height])
         topLine        = topLine - height - titlePadding
         GeneView(referenceGenes, curAxes).plot()
-        IsoformView(graph2, curAxes).plot(isoformLabels=True, 
+        IsoformView(graph2, curAxes).plot(isoformLabels=True,
                                           sortByName=True)
         curAxes.set_title('Isoforms', size=tsize)
         curAxes.set_yticks([])
@@ -386,27 +390,27 @@ def plotCluster(referenceGenes, graph, cluster, start, end, geneModel, outname, 
     for i, r in enumerate(cluster):
         tdict = dict(r.tags)
         if 1:#tdict['XF']:
-            curAxes.plot( [r.blocks[0][0], r.blocks[-1][1] ], 
+            curAxes.plot( [r.blocks[0][0], r.blocks[-1][1] ],
                           [(i+1),(i+1)], 'k', ls='-')
             for b in r.blocks:
                 curAxes.add_patch(Rectangle( (b[0]+1, i+.8), b[1] - b[0], .4,
                                               alpha=1, facecolor='k'))
 
-        
+
     curAxes.set_xlim(xlim)
     curAxes.get_xaxis().get_major_formatter().set_useOffset(False)
     xticks = curAxes.get_xticks()
     curAxes.set_xticklabels([str(int(x)) for x in xticks])
     #curAxes.set_xticks(xticks)
     plt.ylim((0, 2+i))
-    
+
 
     topLine        = topLine - height - titlePadding
 
     curAxes.set_title('Reads', size=tsize)
     #plt.gca().get_xaxis().get_major_formatter().set_useOffset(False)
-    
-    #plotLegend(patchDict)                    
+
+    #plotLegend(patchDict)
     plt.savefig(outname, dpi=400)
     plt.close()
 
@@ -426,7 +430,7 @@ def summarizeClusters(treesP, treesN):
             if len(cluster) == 0:
                 continue
             totClusters += 1
-            referenceGenes = geneModel.getGenesInRange(key.lower(), 
+            referenceGenes = geneModel.getGenesInRange(key.lower(),
                                                        start, end,
                                                        strand='+')
 
@@ -446,7 +450,7 @@ def summarizeClusters(treesP, treesN):
             if len(cluster) == 0:
                 continue
             totClusters += 1
-            referenceGenes = geneModel.getGenesInRange(key.lower(), 
+            referenceGenes = geneModel.getGenesInRange(key.lower(),
                                                        start, end,
                                                        strand='-')
 
@@ -456,8 +460,8 @@ def summarizeClusters(treesP, treesN):
                 misAnnot += len(referenceGenes)
             else:
                 gCounts[referenceGenes[0].id] += 1
-    
-    
+
+
 
 def resolveMultiCluster(cluster, refgenes, strand):
     """
@@ -471,7 +475,7 @@ def resolveMultiCluster(cluster, refgenes, strand):
     uniqueOverlap = numpy.zeros(len(refgenes))
     polyALocs = [ list() for _ in xrange(len(refgenes))]
     graphs = [makeSpliceGraph(gene) for gene in refgenes]
-    
+
     for read in cluster:
         minPos, maxPos = read.blocks[0][0], read.blocks[-1][1]
         overLap = numpy.zeros(len(refgenes))
@@ -483,12 +487,12 @@ def resolveMultiCluster(cluster, refgenes, strand):
             polyALocs[closest].append( minPos )
         else:
             closest = numpy.argmin( [abs(maxPos - refgenes[i].maxpos) for i in xrange(len(refgenes))])
-            
+
             polyALocs[closest].append( maxPos )
         if sum(overLap) == 1:
             uniqueOverlap += overLap
     cluster = [ readDict[rid] for rid in region[-1] ]
-    fusionReads = [ ]    
+    fusionReads = [ ]
     if numpy.sum(numpy.array( [len(x) for x in polyALocs]) > 0 ) > 1:
         clusters = [ list() for _ in xrange(len(refgenes))]
         if strand == '-':
@@ -506,7 +510,7 @@ def resolveMultiCluster(cluster, refgenes, strand):
                         break
                 else:
                     clusters[closest].append(read)
-                
+
         else:
             pends = [ max(x) if x else -numpy.inf for x in polyALocs]
             for read in cluster:
@@ -526,7 +530,7 @@ def resolveMultiCluster(cluster, refgenes, strand):
         return (len(fusionReads) == 0,\
             [ (clusters[i], refgenes[i]) for i in xrange(len(refgenes))])
 
-    
+
 def subsumedIso( iso1, iso2, strand, verbose=False ):
     """
     Checks if iso1 is subsumed by iso2
@@ -536,17 +540,17 @@ def subsumedIso( iso1, iso2, strand, verbose=False ):
     if len(iso1) == 1 and len(iso2) == 1:
         min1,max1 = iso1[0]
         min2,max2 = iso2[0]
-        return min(max1, max2) >= max(min1,min2) 
-    
+        return min(max1, max2) >= max(min1,min2)
+
     if strand == '+':
         iso1 = iso1[::-1]
         iso2 = iso2[::-1]
-        
+
     for i,exon in enumerate(iso1):
 
         min1,max1 = exon
         min2,max2 = iso2[i]
-        
+
         # for last exons, all we care is if
         # exons start at same place
         if i == 0:
@@ -618,7 +622,7 @@ def clusterToIsoforms(cluster, strand):
         # no isoform subsumed the read so add
         else:
             isos.append(readBlocks)
-                        
+
     gapless.sort(key=lambda x: abs(x.blocks[0][0] - x.blocks[0][1]), reverse=1)
     merged = [ ]
     for read in gapless:
@@ -645,7 +649,7 @@ def clusterToIsoforms(cluster, strand):
             isos.append([(minpos,maxpos)])
     return isos
 
- 
+
 def processGene(isos, cluster, gene):
     """
     Summarize isos for gene
@@ -693,9 +697,9 @@ def processGene(isos, cluster, gene):
     predIntrons = set( [(edge.minpos, edge.maxpos) for edge in edgeSet(graph)])
     novel = [ ]
     fullLength = [ ]
-    
+
     # check if iso is full-length
-    # check if iso is novel    
+    # check if iso is novel
     for isoNum,iso in enumerate(isos):
         minPos,maxPos = iso[0] if strand == '+' else iso[-1]
         for minG, maxG in starts:
@@ -715,7 +719,7 @@ def processGene(isos, cluster, gene):
                     break
         else:
             fullLength.append(False)
-            
+
         isoName = '%s_%d' % (gene.id, isoNum+1)
         for node in graph.isoformDict()[isoName]:
             if node.isRoot():
@@ -756,7 +760,7 @@ def writeNovelGenes(novelClustersP, novelClustersN):
             indicator.update()
             longest = sorted( cluster, key=lambda x: len(x.query), reverse=1)[0]
             minpos  = min(x.blocks[0][0] for x in cluster)
-            maxpos  = max(x.blocks[-1][1] for x in cluster) 
+            maxpos  = max(x.blocks[-1][1] for x in cluster)
             nid = '%s_%d_%d_+' % (key, minpos,maxpos)
             novelReads[nid] = len(cluster)
             graph = clusterToGraphP(cluster, key,'none')
@@ -775,7 +779,7 @@ def writeNovelGenes(novelClustersP, novelClustersN):
             indicator.update()
             longest = sorted( cluster, key=lambda x: len(x.query), reverse=1)[0]
             minpos  = min(x.blocks[0][0] for x in cluster)
-            maxpos  = max(x.blocks[-1][1] for x in cluster) 
+            maxpos  = max(x.blocks[-1][1] for x in cluster)
             nid = '%s_%d_%d_-' % (key, minpos,maxpos)
             novelReads[nid] = len(cluster)
             graph = clusterToGraphP(cluster, key,'none')
@@ -824,11 +828,11 @@ def getPeaks(depths):
     return peaks, counts
 
 def polyA_analysis(polyAMap):
-    ofile = open(os.path.join(args.outdir,'polyA_summary.csv'), 'w') 
+    ofile = open(os.path.join(args.outdir,'polyA_summary.csv'), 'w')
     ofile.write('gene\tstrand\taligned reads\tnum sites\tlocations\n')
     if args.verbose:
         sys.stderr.write('Performing poly(A) analysis\n')
-    polyAcounts = collections.defaultdict(int)    
+    polyAcounts = collections.defaultdict(int)
     polyAGene = collections.defaultdict(list)
     indicator = ProgressIndicator(5000, verbose=args.verbose)
     for gene in polyAMap:
@@ -867,10 +871,10 @@ def polyA_analysis(polyAMap):
             ax.set_xlabel('Coordinates', size=18)
             plt.tight_layout()
             plt.savefig(os.path.join(args.outdir,'polyAFigures', '%s.png' % gene.id))
-            plt.close()    
+            plt.close()
     ofile.close()
     indicator.finish()
-    
+
 def remove_border(axes=None, top=False, right=False, left=True, bottom=True):
     """
     Minimize chartjunk by stripping out unnecesasry plot borders and axis ticks
@@ -882,11 +886,11 @@ def remove_border(axes=None, top=False, right=False, left=True, bottom=True):
     ax.spines['right'].set_visible(right)
     ax.spines['left'].set_visible(left)
     ax.spines['bottom'].set_visible(bottom)
-    
+
     #turn off all ticks
     ax.yaxis.set_ticks_position('none')
     ax.xaxis.set_ticks_position('none')
-    
+
     #now re-enable visibles
     if top:
         ax.xaxis.tick_top()
@@ -938,14 +942,14 @@ if __name__ == '__main__':
     readDict = { }
     clusterDist = 50
     clusterMembers = 1
-    cluster_treesP = collections.defaultdict(lambda:ClusterTree(clusterDist, 
+    cluster_treesP = collections.defaultdict(lambda:ClusterTree(clusterDist,
                                                                 clusterMembers))
-    cluster_treesN = collections.defaultdict(lambda:ClusterTree(clusterDist, 
+    cluster_treesN = collections.defaultdict(lambda:ClusterTree(clusterDist,
                                                                 clusterMembers))
     clusterReads(args.bamfile, cluster_treesP, cluster_treesN, readDict)
-    keys = list(set.union(*[set(cluster_treesN.keys()), 
+    keys = list(set.union(*[set(cluster_treesN.keys()),
                             set(cluster_treesP.keys())]))
-    
+
     # Transcript assembly
     geneIsos = collections.defaultdict(list)
     geneReads = collections.defaultdict(list)
@@ -1020,7 +1024,7 @@ if __name__ == '__main__':
         sys.stderr.write('%d (%0.2f%%) spanning multiple genes\n' % (allMulti, float(allMulti)/len(allIsos)))
     writeGtf(geneIsos)
     writeNovelGenes(novelClustersP, novelClustersN)
-    
+
     polyAMap = {}
     for gene in geneReads:
         if gene.strand == '+':
@@ -1030,23 +1034,13 @@ if __name__ == '__main__':
     polyA_analysis(polyAMap)
 
 
-    #compute AS statistics
+    # compute AS statistics with TAPIS-owned NetworkX topology engine
     if args.verbose:
         sys.stderr.write('Computing alternative splicing statistics\n')
+    from tapis.topology.reporting import write_as_statistics_from_gtf
 
-    graphsdir = os.path.join(args.outdir, 'graphs')
-    if not os.path.exists(graphsdir):
-        os.makedirs(graphsdir)
-
-    cmd = 'gene_model_to_splicegraph.py -a -A -d %s -m %s' % (graphsdir, os.path.join(args.outdir,'assembled.gtf'))
+    assembled_gtf = os.path.join(args.outdir, 'assembled.gtf')
+    as_statistics = os.path.join(args.outdir, 'AS_statistics.txt')
+    write_as_statistics_from_gtf(assembled_gtf, as_statistics)
     if args.verbose:
-        cmd += ' -v'
-        sys.stderr.write('Executing %s\n' % (cmd) )
-    
-    subprocess.call(cmd,shell=1)
-
-    cmd = 'splicegraph_statistics.py -a %s -o %s' % (graphsdir, os.path.join(args.outdir, 'AS_statistics.txt'))
-    if args.verbose:
-        cmd += ' -v'
-        sys.stderr.write('Executing %s\n' % (cmd) )
-    subprocess.call(cmd,shell=1)
+        sys.stderr.write('Wrote %s\n' % (as_statistics))
