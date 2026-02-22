@@ -6,7 +6,13 @@ from tapis.topology.graph import (
     extract_read_exons_from_bam,
     parse_gtf_exons,
 )
-from tapis.topology.reporting import compute_as_statistics_from_gtf, write_as_statistics_from_gtf
+from tapis.topology.reporting import (
+    compute_as_statistics_from_gtf,
+    compute_events_from_transcripts,
+    write_as_statistics_from_gtf,
+    write_event_table,
+    write_event_table_from_gtf_and_bam,
+)
 
 __all__ = [
     "SpliceEvent",
@@ -17,5 +23,8 @@ __all__ = [
     "parse_gtf_exons",
     "detect_splice_events",
     "compute_as_statistics_from_gtf",
+    "compute_events_from_transcripts",
     "write_as_statistics_from_gtf",
+    "write_event_table",
+    "write_event_table_from_gtf_and_bam",
 ]

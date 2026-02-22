@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from tapis.topology.enums import SpliceEventKind
 from tapis.topology.events import detect_splice_events
 from tapis.topology.graph import build_annotation_graph
 
@@ -16,8 +17,8 @@ def test_detects_exon_skipping_and_intron_retention() -> None:
     events = detect_splice_events(graph, observed)
 
     kinds = {(event.kind, event.detail) for event in events}
-    assert ("exon_skipping", "200-250") in kinds
-    assert ("intron_retention", "151-199") in kinds
+    assert (SpliceEventKind.EXON_SKIPPING, "200-250") in kinds
+    assert (SpliceEventKind.INTRON_RETENTION, "151-199") in kinds
 
 
 def test_detects_alternative_splice_site() -> None:
@@ -31,4 +32,4 @@ def test_detects_alternative_splice_site() -> None:
     events = detect_splice_events(graph, observed)
 
     kinds = {(event.kind, event.detail) for event in events}
-    assert ("alternative_splice_site", "151-210") in kinds
+    assert (SpliceEventKind.ALTERNATIVE_SPLICE_SITE, "151-210") in kinds
