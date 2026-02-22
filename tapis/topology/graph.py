@@ -89,7 +89,8 @@ def extract_read_exons_from_bam(
                 continue
             if read.query_name is None:
                 continue
-            transcripts[read.query_name] = normalize_exons(blocks)
+            exons_one_based = [(start + 1, end) for start, end in blocks]
+            transcripts[read.query_name] = normalize_exons(exons_one_based)
     return transcripts
 
 

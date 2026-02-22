@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tapis.topology.enums import SpliceEventKind
 from tapis.topology.reporting import write_as_statistics_from_gtf
 
 
@@ -41,4 +42,4 @@ def test_writes_as_statistics_from_gtf(tmp_path: Path) -> None:
 
     lines = out_path.read_text(encoding="utf-8").strip().splitlines()
     assert lines[0] == "event\tcount"
-    assert any(line.startswith("exon_skipping\t") for line in lines[1:])
+    assert any(line.startswith(f"{SpliceEventKind.EXON_SKIPPING.value}\t") for line in lines[1:])

@@ -1037,10 +1037,16 @@ if __name__ == '__main__':
     # compute AS statistics with TAPIS-owned NetworkX topology engine
     if args.verbose:
         sys.stderr.write('Computing alternative splicing statistics\n')
-    from tapis.topology.reporting import write_as_statistics_from_gtf
+    from tapis.topology.reporting import (
+        write_as_statistics_from_gtf,
+        write_event_table_from_gtf_and_bam,
+    )
 
     assembled_gtf = os.path.join(args.outdir, 'assembled.gtf')
     as_statistics = os.path.join(args.outdir, 'AS_statistics.txt')
+    as_events = os.path.join(args.outdir, 'AS_events.tsv')
     write_as_statistics_from_gtf(assembled_gtf, as_statistics)
+    write_event_table_from_gtf_and_bam(assembled_gtf, args.bamfile, as_events)
     if args.verbose:
         sys.stderr.write('Wrote %s\n' % (as_statistics))
+        sys.stderr.write('Wrote %s\n' % (as_events))
